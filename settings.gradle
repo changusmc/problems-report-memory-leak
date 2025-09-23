@@ -1,0 +1,37 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id 'com.gradle.develocity' version '3.18.1'
+}
+
+develocity {
+    server = 'https://gradle-enterprise.pinadmin.com/'
+    buildScan {
+        termsOfUseUrl = 'yes'
+        termsOfUseAgree = 'https://gradle.com/terms-of-service'
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'memory-leak-repro'
+
+// // Create multiple modules to simulate large Android project
+def moduleCount = 20
+
+moduleCount.times { i ->
+    def moduleName = "module${i}"
+    include moduleName
+}

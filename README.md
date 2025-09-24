@@ -3,8 +3,8 @@
 This project investigates the `VisitableURLClassLoader` memory leak in a multi-module Gradle project, even after converting from Android to pure Kotlin libraries.
 
 ## Problem
+<img width="1538" height="793" alt="image" src="https://github.com/user-attachments/assets/7ff039b5-2ed4-4f96-a2b1-b46d376a7450" />
 
-<img width="1538" height="793" alt="image" src="https://github.com/user-attachments/assets/4fff745b-681a-4432-9092-50812425daaf" />
 
 **The Issue:**
 - **54.8MB retained heap** in `DefaultRootBuildState` and related Gradle infrastructure

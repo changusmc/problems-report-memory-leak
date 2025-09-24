@@ -1,97 +1,73 @@
-# Multi-Module Android Memory Leak Reproduction
+# Multi-Module Kotlin Memory Leak Investigation
 
-This project reproduces the memory leak issue with KSP tasks, KAPT processing, and Gradle's dependency resolution cache in a realistic multi-module Android project.
+This project investigates the `VisitableURLClassLoader` memory leak in a multi-module Gradle project, even after converting from Android to pure Kotlin libraries.
 
-## The Problem
+## Problem
 
-The memory leak manifests as:
-- 526 instances of `kotlinx.serialization.json.JsonObject` consuming 724MB
-- `VariantArtifactSetCache` holding onto `ConcurrentHashMap` entries
-- `ThisBuildTreeOnlyComponentResultSerializer` retaining 10.7MB
+<img width="1538" height="793" alt="image" src="https://github.com/user-attachments/assets/4fff745b-681a-4432-9092-50812425daaf" />
+
+**The Issue:**
+- **54.8MB retained heap** in `DefaultRootBuildState` and related Gradle infrastructure
+- `ConfigurationCacheFingerprintController` holding onto large object graphs
+- `DefaultListenerManager` retaining 54.9MB through event listener chains
+- `ProblemsProgressEventEmitterHolder` with 2,263,696 bytes in object arrays
+- `VisitableURLClassLoader` consuming 3.4MB across multiple threads
 - Thread-local variables in execution workers not being cleaned up
-- KSP and KAPT annotation processor memory leaks
 - **Configuration cache incompatibility** with `buildFinished` listeners
 
-## How to Reproduce
+## How to Reproduce the Memory Leak
 
-1. **Generate modules and run the test**:
+1. **Run the build**:
    ```bash
-   ./test-memory-leak.sh
+   # Build all modules 
+   ./gradlew clean build
    ```
 
-2. **Or run manually**:
-   ```bash
-   # Generate 20 Android modules
-   ./gradlew generateModules --no-configuration-cache
-   
-   # Test with configuration cache (shows memory leak)
-   ./gradlew clean kspDebugKotlin --configuration-cache
-   
-   # Test without configuration cache
-   ./gradlew clean kspDebugKotlin --no-configuration-cache
-   ```
-
-3. **Generate heap dump**:
+2. **Generate heap dump**:
    ```bash
    # Add -XX:+HeapDumpOnOutOfMemoryError to gradle.properties
    # Or use jmap to generate heap dump during build
    jmap -dump:format=b,file=heap.hprof <gradle-daemon-pid>
    ```
 
-## Key Memory Leak Indicators
-
-When running the tests, look for these specific error messages:
-
-1. **Configuration Cache Error**:
-   ```
-   Build file 'build.gradle': line 57: registration of listener on 'Gradle.buildFinished' is unsupported
-   ```
-
-2. **Deprecated API Warning**:
-   ```
-   The deprecated "gradleEnterprise.buildScan.buildScanPublished" API has been replaced by "develocity.buildScan.buildScanPublished"
-   ```
-
-3. **Multiple KSP Tasks**: 20 modules × KSP processing = memory pressure
-
 ## Project Structure
 
-- **20 Android library modules** to simulate a large multi-module project
-- **KSP processing** with Dagger on each module to trigger the memory leak
-- **KAPT processing** with Java classes on each module
-- **Build scan plugin** to reproduce the `buildFinished` listener memory leak
-- **Multiple Android dependencies** to create dependency resolution work
-- **Realistic Android project structure** with Activities, Services, and Resources
+- **10 Kotlin JVM library modules** (module0-module9) - Still causing memory leaks
+- **1 Kotlin JVM application** (app) - Entry point
+- **Pure Kotlin dependencies** - No Android complexity
+- **Multi-module Gradle build** - Still problematic
 
-## Expected Memory Leak Pattern
+## Technical Details
 
-When analyzing the heap dump, look for:
-1. `VariantArtifactSetCache` with large `ConcurrentHashMap`
-2. `ThisBuildTreeOnlyComponentResultSerializer` retaining memory
-3. Multiple `JsonObject` instances from dependency metadata
-4. Thread-local variables in execution workers
-5. KSP and KAPT annotation processor memory leaks
-6. Android-specific dependency resolution cache leaks
+### Versions Used
+- **Gradle**: 9.1.0
+- **Kotlin**: 2.0.21
+- **Kotlin Serialization**: 2.0.21
+- **Java**: 21 (JVM Toolchain)
+- **Kotlinx Coroutines**: 1.7.3
+- **Kotlinx Serialization**: 1.6.0
+- **Ktor**: 2.3.7
 
-## Gradle Version
+### Build Configuration
+- **Pure Kotlin JVM libraries** - No Android dependencies
+- **Java 21 compatibility** - Modern JVM features
+- **Kotlin JVM toolchain** - Consistent compilation
+- **Serialization support** - JSON processing
+- **Coroutines support** - Async programming
 
-- Gradle: 8.13
-- Android Gradle Plugin: 8.3.2
-- Kotlin: 2.0.21
-- KSP: 2.0.21-1.0.26
-- Dagger: 2.51.1
+## Investigation Results
 
-## Root Cause
+**Converting from Android to Kotlin libraries did NOT solve the memory leak:**
 
-The memory leak is caused by:
-1. **`buildFinished` listeners** that are incompatible with configuration cache
-2. **KSP tasks** holding onto dependency resolution cache
-3. **Thread-local variables** in execution workers not being cleaned up
-4. **Multiple annotation processors** running simultaneously across many modules
+1. **Android Gradle Plugin removed** - But memory leak persists
+2. **Pure Kotlin JVM libraries** - Still causing `VisitableURLClassLoader` retention
+3. **Multi-module Gradle builds** - Still problematic regardless of language
+4. **Gradle dependency resolution** - Still causing memory leaks
+5. **Configuration cache issues** - Still incompatible with multi-module builds
 
-## Related Issues
+## Conclusion
 
-- Gradle Issue #8142: Custom attribute types memory leak
-- Gradle Issue #30654: Configuration cache memory usage
-- Gradle Issue #23215: High memory usage in complex projects
-- KSP Issue #1698: Memory leak in KSP tasks
+❌ **Memory leak NOT solved** - `VisitableURLClassLoader` retention still present  
+❌ **Multi-module builds still problematic** - Gradle build system still causing issues  
+❌ **Configuration cache still incompatible** - Multi-module builds still problematic  
+❌ **Root cause not eliminated** - The issue is with Gradle's multi-module build system, not Android
